@@ -1,0 +1,57 @@
+name: HARDCORE (LINUX)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
+    steps:
+      - name: Install Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscaled --state=/var/lib/tailscale/tailscaled.state &
+          sleep 3
+          
+      - name: Create User
+        run: |
+          PASSWORD="admin@123"
+          USERNAME="toolboxlap"
+          
+          sudo useradd -m -s /bin/bash $USERNAME
+          echo "$USERNAME:$PASSWORD" | sudo chpasswd
+          sudo usermod -aG sudo $USERNAME
+          
+          echo "USERNAME=$USERNAME" >> $GITHUB_ENV
+          echo "PASSWORD=$PASSWORD" >> $GITHUB_ENV
+          
+      - name: Connect Tailscale
+        run: |
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-terminal-$GITHUB_RUN_ID
+          
+          sleep 5
+          TS_IP=$(tailscale ip -4 2>/dev/null)
+          echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
+          
+      - name: Display Connection Info
+        run: |
+          echo "╔════════════════════════════════════════╗"
+          echo "║     LINUX TERMINAL - READY!          ║"
+          echo "╠════════════════════════════════════════╣"
+          echo "║                                      ║"
+          echo "║  SSH Command:                        ║"
+          echo "║  ssh ${{ env.USERNAME }}@${{ env.TAILSCALE_IP }}"
+          echo "║                                      ║"
+          echo "║  Username: ${{ env.USERNAME }}       ║"
+          echo "║  Password: ${{ env.PASSWORD }}       ║"
+          echo "║                                      ║"
+          echo "╚════════════════════════════════════════╝"
+          
+      - name: Keep Alive
+        run: |
+          while true; do
+            echo "[$(date)] Terminal active"
+            sleep 300
+          done
