@@ -156,4 +156,3 @@ Created with ❤️ for the open source community.
 If this helped you, give it a ⭐!
 <p align="center"> <b>💻 Terminal Anywhere, Anytime!</b> </p> ```
 
-هذا كل شيء! جاهز للنشر. هل تريد تعديل أي جزء؟
