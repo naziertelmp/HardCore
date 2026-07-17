@@ -1,4 +1,4 @@
-name: HARDCORE (LINUX)
+name: Linux Terminal Only
 
 on:
   workflow_dispatch:
@@ -17,41 +17,62 @@ jobs:
           
       - name: Create User
         run: |
-          PASSWORD="admin@123"
-          USERNAME="toolboxlap"
-          
-          sudo useradd -m -s /bin/bash $USERNAME
-          echo "$USERNAME:$PASSWORD" | sudo chpasswd
-          sudo usermod -aG sudo $USERNAME
-          
-          echo "USERNAME=$USERNAME" >> $GITHUB_ENV
-          echo "PASSWORD=$PASSWORD" >> $GITHUB_ENV
+          sudo useradd -m -s /bin/bash toolboxlap
+          echo "toolboxlap:admin@123" | sudo chpasswd
+          sudo usermod -aG sudo toolboxlap
           
       - name: Connect Tailscale
         run: |
-          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-terminal-$GITHUB_RUN_ID
+          sudo tailscale up --hostname=gh-terminal-$GITHUB_RUN_ID
           
-          sleep 5
-          TS_IP=$(tailscale ip -4 2>/dev/null)
+          echo "Waiting for authentication..."
+          echo ""
+          
+          TS_IP=""
+          retries=0
+          while [ -z "$TS_IP" ] && [ $retries -lt 30 ]; do
+              TS_IP=$(tailscale ip -4 2>/dev/null)
+              if [ -z "$TS_IP" ]; then
+                  echo "[$(date)] Waiting for you to authenticate... ($retries/30)"
+                  sleep 10
+                  retries=$((retries + 1))
+              fi
+          done
+          
+          if [ -z "$TS_IP" ]; then
+              echo "Authentication timeout. Exiting."
+              exit 1
+          fi
           echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
+          
+      - name: Verify SSH Accessibility
+        run: |
+          echo "Tailscale IP: ${{ env.TAILSCALE_IP }}"
+          echo "Testing SSH connection..."
+          sleep 5
+          if nc -zv ${{ env.TAILSCALE_IP }} 22; then
+              echo "SSH connectivity successful!"
+          else
+              echo "SSH port may need a moment..."
+          fi
           
       - name: Display Connection Info
         run: |
+          echo ""
           echo "╔════════════════════════════════════════╗"
           echo "║     LINUX TERMINAL - READY!          ║"
           echo "╠════════════════════════════════════════╣"
           echo "║                                      ║"
-          echo "║  SSH Command:                        ║"
-          echo "║  ssh ${{ env.USERNAME }}@${{ env.TAILSCALE_IP }}"
-          echo "║                                      ║"
-          echo "║  Username: ${{ env.USERNAME }}       ║"
-          echo "║  Password: ${{ env.PASSWORD }}       ║"
+          echo "║  SSH: ssh toolboxlap@${{ env.TAILSCALE_IP }}"
+          echo "║  Username: toolboxlap                ║"
+          echo "║  Password: admin@123                 ║"
           echo "║                                      ║"
           echo "╚════════════════════════════════════════╝"
+          echo ""
           
       - name: Keep Alive
         run: |
           while true; do
-            echo "[$(date)] Terminal active"
-            sleep 300
+              echo "[$(date)] Terminal active"
+              sleep 300
           done
