@@ -1,0 +1,60 @@
+name: Linux Terminal Only
+
+on:
+  workflow_dispatch:
+
+jobs:
+  terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
+    steps:
+      - name: Install Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscaled --state=/var/lib/tailscale/tailscaled.state &
+          sleep 3
+          
+      - name: Create User
+        run: |
+          sudo useradd -m -s /bin/bash toolboxlap
+          echo "toolboxlap:admin@123" | sudo chpasswd
+          sudo usermod -aG sudo toolboxlap
+          
+      - name: Connect Tailscale
+        run: |
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-terminal-$GITHUB_RUN_ID
+          
+          TS_IP=""
+          retries=0
+          while [ -z "$TS_IP" ] && [ $retries -lt 10 ]; do
+              TS_IP=$(tailscale ip -4 2>/dev/null)
+              sleep 5
+              retries=$((retries + 1))
+          done
+          
+          if [ -z "$TS_IP" ]; then
+              echo "Tailscale IP not assigned. Exiting."
+              exit 1
+          fi
+          echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
+          
+      - name: Display Connection Info
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════╗"
+          echo "║     LINUX TERMINAL - READY!          ║"
+          echo "╠════════════════════════════════════════╣"
+          echo "║  ssh toolboxlap@${{ env.TAILSCALE_IP }}"
+          echo "║  Username: toolboxlap                ║"
+          echo "║  Password: admin@123                 ║"
+          echo "╚════════════════════════════════════════╝"
+          echo ""
+          echo "✅ Copy the SSH command above!"
+          
+      - name: Keep Alive
+        run: |
+          while true; do
+              echo "[$(date)] Terminal active | ssh toolboxlap@${{ env.TAILSCALE_IP }}"
+              sleep 300
+          done
